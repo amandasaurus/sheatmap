@@ -10,12 +10,17 @@ use anyhow::{Context, Result};
 
 
 fn main() -> Result<()> {
-    let matches = App::new("My Super Program")
+    let matches = App::new("Heatmap")
+        .version(env!("CARGO_PKG_VERSION"))
+        .about("Create heatmaps")
         .arg(Arg::with_name("input")
-             .short("i")
+             .short("i").long("input")
+             .help("Input CSV file").value_name("INPUT.csv")
              .takes_value(true).required(true))
         .arg(Arg::with_name("output")
-             .short("o")
+             .short("o").long("output")
+             .help("Output XYZ ASCII grid file")
+             .value_name("OUTPUT.xyz")
              .takes_value(true).required(true))
         .arg(Arg::with_name("xmin")
              .long("xmin")
@@ -31,14 +36,19 @@ fn main() -> Result<()> {
              .takes_value(true))
         .arg(Arg::with_name("res")
              .short("R").long("res")
+             .help("Resolution of image")
+             .value_name("xrex yres")
              .number_of_values(2)
              .takes_value(true).required(true))
         .arg(Arg::with_name("size")
              .short("s").long("size")
+             .help("Size of image")
+             .value_name("width height")
              .number_of_values(2)
              .takes_value(true))
         .arg(Arg::with_name("radius")
              .short("r").long("radius")
+             .help("Radius value for heatmap")
              .takes_value(true).required(true)
              .default_value("10")
              )
@@ -60,7 +70,6 @@ fn main() -> Result<()> {
         ymin = ymin.map(|ymin| if y < ymin { Some(y) } else { Some(ymin) }).unwrap_or(Some(y));
         points.push([x, y]);
     }
-    dbg!(points.len());
     let tree = rstar::RTree::bulk_load(points);
 
     let radius: f64 = matches.value_of("radius").unwrap().parse()?;
@@ -77,7 +86,6 @@ fn main() -> Result<()> {
 
     let width = ((xmax - xmin)/xres).round() as usize;
     let height = ((ymax - ymin)/yres).round() as usize;
-    dbg!(width, height);
 
     let mut results = vec![0.; width*height];
 
@@ -98,8 +106,6 @@ fn main() -> Result<()> {
         }
     }
 
-    //dbg!(&results.iter().enumerate().filter(|(_, v)| **v != 0.).collect::<Vec<_>>());
-    
     // print output
     let output_path = matches.value_of("output").unwrap();
     let mut output = BufWriter::new(File::create(output_path)?);
@@ -109,22 +115,9 @@ fn main() -> Result<()> {
         let i = idx % width;
         posy = ymin + (j as f64) * yres;
         posx = xmin + (i as f64) * xres;
-        //if *val != 0. {
-        //    dbg!(i, j, posx, posy, val);
-        //}
         writeln!(output, "{} {} {}", posx, posy, val)?;
     }
 
-    let mut output_vrt = BufWriter::new(File::create(format!("{}.vrt", output_path))?);
-    write!(output_vrt,
-r#"<OGRVRTDataSource>
-    <OGRVRTLayer name="{}">
-      <SrcDataSource>{}</SrcDataSource> 
-      <GeometryType>wkbPoint</GeometryType> 
-      <GeometryField encoding="PointFromColumns" x="field_1" y="field_2" z="field_3"/>
-    </OGRVRTLayer>
-</OGRVRTDataSource>
-"#, output_path, output_path)?;
     Ok(())
 }
 
