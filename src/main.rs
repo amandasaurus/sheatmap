@@ -82,10 +82,11 @@ fn main() -> Result<()> {
     let mut results = vec![0.; width*height];
 
     let mut new_value;
+    let mut posy; let mut posx;
     for i in 0..width {
-        let posx = xmin + (i as f64) * xres;
+        posx = xmin + (i as f64) * xres;
         for j in 0..height {
-            let posy = ymin + (j as f64) * yres;
+            posy = ymin + (j as f64) * yres;
             new_value = 0.;
             for [x, y] in tree.locate_in_envelope(&rstar::AABB::from_corners([posx-radius, posy-radius], [posx+radius, posy+radius])) {
                 let dist_sq = (x-posx).powi(2) + (y-posy).powi(2);
@@ -93,20 +94,25 @@ fn main() -> Result<()> {
                     new_value += kde_quatratic(dist_sq.sqrt(), radius);
                 }
             }
-            results[i*width+j] = new_value;
+            results[j*width+i] = new_value;
         }
     }
+
+    //dbg!(&results.iter().enumerate().filter(|(_, v)| **v != 0.).collect::<Vec<_>>());
     
     // print output
     let output_path = matches.value_of("output").unwrap();
     let mut output = BufWriter::new(File::create(output_path)?);
     writeln!(output, "x y z")?;
-    for j in 0..height {
-        let posy = ymin + (j as f64) * yres;
-        for i in 0..width {
-            let posx = xmin + (i as f64) * xres;
-            writeln!(output, "{} {} {}", posx, posy, results[i*width+j])?;
-        }
+    for (idx, val) in results.iter().enumerate() {
+        let j = idx / width;
+        let i = idx % width;
+        posy = ymin + (j as f64) * yres;
+        posx = xmin + (i as f64) * xres;
+        //if *val != 0. {
+        //    dbg!(i, j, posx, posy, val);
+        //}
+        writeln!(output, "{} {} {}", posx, posy, val)?;
     }
 
     let mut output_vrt = BufWriter::new(File::create(format!("{}.vrt", output_path))?);
