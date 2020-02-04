@@ -4,9 +4,12 @@ extern crate clap;
 extern crate anyhow;
 #[macro_use] extern crate log;
 extern crate env_logger;
+extern crate flate2;
 use clap::{Arg, App};
 use std::io::{Write, BufWriter};
 use std::fs::*;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 
 use anyhow::{Context, Result};
 
@@ -59,6 +62,15 @@ fn main() -> Result<()> {
         .arg(Arg::with_name("assume_lat_lon")
              .long("assume-lat-lon")
              )
+
+        .arg(Arg::with_name("compression")
+             .short("c").long("compression")
+             .takes_value(true).required(false)
+             .possible_values(&["none", "auto", "gzip"])
+             .default_value("auto")
+             .help("Should the output file be compressed?")
+             )
+
         .get_matches();
 
     env_logger::init();
@@ -104,7 +116,15 @@ fn main() -> Result<()> {
     let height = ((ymax - ymin)/yres).round() as usize;
 
     let output_path = matches.value_of("output").unwrap();
-    let mut output = BufWriter::new(File::create(output_path)?);
+    let mut output: Box<dyn Write> = match (matches.value_of("compression").unwrap(), output_path.ends_with(".gz")) {
+        ("gzip", _) | ("auto", true) => {
+            Box::new(GzEncoder::new(File::create(output_path)?, Compression::default()))
+        },
+        ("none", _) | ("auto", false) => {
+            Box::new(File::create(output_path)?)
+        },
+        _ => unreachable!(),
+    };
     writeln!(output, "x y z")?;
 
     let mut value;
