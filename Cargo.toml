@@ -1,5 +1,7 @@
 [package]
 name = "sheatmap"
+description = "Generate heatmap image data from input points. Usable easily with gdal to make heatmap geotiffs from points"
+license = "AGPL-3.0+"
 version = "0.1.0"
 authors = ["Rory McCann <rory@technomancy.org>"]
 edition = "2018"
