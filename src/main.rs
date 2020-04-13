@@ -80,6 +80,14 @@ fn main() -> Result<()> {
              .long("ymax")
              .help("Use this as the ymax of the image rather than use ymax of data")
              .takes_value(true))
+
+        .arg(Arg::with_name("bbox")
+             .long("bbox").value_name("XMIN,YMIN,XMAX,YMAX")
+             .help("Use as bbox of image to create")
+             .takes_value(true)
+             .conflicts_with_all(&["xmin", "ymin", "xmax", "ymax"])
+             )
+
         .arg(Arg::with_name("assume_lat_lon")
              .long("assume-lat-lon")
              .help("Input coordinates are treated as lat lon, but all measurements are done with great circle distance in metre. Radius & res is in metres")
@@ -145,10 +153,20 @@ fn main() -> Result<()> {
     // used for bbox query
     let approx_radius_deg = to_srs_coord(assume_lat_lon, radius);
 
-    let xmin: f64 = match matches.value_of("xmin") { None => xmin.unwrap()-approx_radius_deg, Some(xmin) => xmin.parse()? };
-    let xmax: f64 = match matches.value_of("xmax") { None => xmax.unwrap()+approx_radius_deg, Some(xmax) => xmax.parse()? };
-    let ymin: f64 = match matches.value_of("ymin") { None => ymin.unwrap()-approx_radius_deg, Some(ymin) => ymin.parse()? };
-    let ymax: f64 = match matches.value_of("ymax") { None => ymax.unwrap()+approx_radius_deg, Some(ymax) => ymax.parse()? };
+    let (xmin, ymin, xmax, ymax) = if let Some(bbox_str) = matches.value_of("bbox") {
+        let bbox: Vec<f64> = bbox_str.split(",")
+            .map(|v| v.trim().parse::<f64>().context("parsing number in bbox"))
+            .collect::<Result<Vec<f64>>>()?;
+        ensure!(bbox.len() == 4, "bbox must contain 4 numbers");
+        (bbox[0], bbox[1], bbox[2], bbox[3])
+    } else {
+        (
+            match matches.value_of("xmin") { None => xmin.unwrap()-approx_radius_deg, Some(xmin) => xmin.parse()? },
+            match matches.value_of("ymin") { None => ymin.unwrap()-approx_radius_deg, Some(ymin) => ymin.parse()? },
+            match matches.value_of("xmax") { None => xmax.unwrap()+approx_radius_deg, Some(xmax) => xmax.parse()? },
+            match matches.value_of("ymax") { None => ymax.unwrap()+approx_radius_deg, Some(ymax) => ymax.parse()? },
+        )
+    };
 
 
     let xres: f64 = to_srs_coord(assume_lat_lon, matches.values_of("res").unwrap().nth(0).unwrap().parse()?);
