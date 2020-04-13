@@ -1,7 +1,7 @@
 extern crate rstar;
 extern crate csv;
 extern crate clap;
-extern crate anyhow;
+#[macro_use] extern crate anyhow;
 #[macro_use] extern crate log;
 extern crate env_logger;
 extern crate flate2;
@@ -19,6 +19,7 @@ static EARTH_RADIUS_M: f64 = 6_371_000.;
 fn main() -> Result<()> {
     let matches = App::new("sHeatMap")
         .version(env!("CARGO_PKG_VERSION"))
+        .setting(clap::AppSettings::AllowLeadingHyphen)
         .about("Create heatmaps from input CSV files")
         .arg(Arg::with_name("input")
              .short("i").long("input")
@@ -81,6 +82,7 @@ fn main() -> Result<()> {
              .takes_value(true))
         .arg(Arg::with_name("assume_lat_lon")
              .long("assume-lat-lon")
+             .help("Input coordinates are treated as lat lon, but all measurements are done with great circle distance in metre. Radius & res is in metres")
              )
 
         .arg(Arg::with_name("algorithm")
@@ -191,7 +193,8 @@ fn main() -> Result<()> {
         _ => unreachable!(),
     };
 
-    let dist_calc = match matches.value_of("algorithm").unwrap() {
+    // Only within radius
+    let outside_radius_possible = match matches.value_of("algorithm").unwrap() {
         "uniform" => false,
         "triangular" => false,
         "parabolic" => false,
@@ -216,7 +219,12 @@ fn main() -> Result<()> {
             posx = xmin + (i as f64) * xres;
 
             value = 0.;
-            for point in tree.locate_in_envelope(&rstar::AABB::from_corners([posx-approx_radius_deg, posy-approx_radius_deg], [posx+approx_radius_deg, posy+approx_radius_deg])) {
+            for point in tree.locate_in_envelope(
+                    &rstar::AABB::from_corners(
+                        [posx-approx_radius_deg, posy-approx_radius_deg],
+                        [posx+approx_radius_deg, posy+approx_radius_deg]
+                    ))
+            {
 
                 x = point.position()[0];
                 y = point.position()[1];
@@ -224,12 +232,12 @@ fn main() -> Result<()> {
 
                 if assume_lat_lon {
                     let dist = haversine_dist(y, x, posy, posx);
-                    if dist_calc || dist <= radius {
+                    if outside_radius_possible || dist <= radius {
                         value += point_value*kernel_func(dist/radius);
                     }
                 } else {
                     let dist_sq = (x-posx).powi(2) + (y-posy).powi(2);
-                    if dist_calc || dist_sq <= radius_sq {
+                    if outside_radius_possible || dist_sq <= radius_sq {
                         value += point_value*kernel_func(dist_sq.sqrt()/radius);
                     }
                 }
