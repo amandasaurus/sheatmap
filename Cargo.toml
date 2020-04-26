@@ -5,8 +5,8 @@ license = "AGPL-3.0+"
 version = "0.1.0"
 authors = ["Rory McCann <rory@technomancy.org>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+repository = "https://git.sr.ht/~ebel/sheatmap"
+website = "https://git.sr.ht/~ebel/sheatmap"
 
 [dependencies]
 clap = "2.33.0"
